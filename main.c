@@ -53,8 +53,8 @@ main (int argc, char *argv[])
     // Zero everything
     workspaces.w = 
     workspaces.active = 
-    workspaces_prev.w = 
-    workspaces_prev.active = 0;
+    workspaces_prev.w = 0;
+    workspaces_prev.active = -1; // So we run at startup too
 
     d = XOpenDisplay(0);
     screen = XDefaultScreen(d);
