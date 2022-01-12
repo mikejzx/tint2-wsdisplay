@@ -1,0 +1,38 @@
+tint2-wsdisplay
+===============
+
+Small "workspace display" program, intended to be used with the Tint2 panel as
+an executor command.  Active workspace is displayed as a coloured dot,
+workspaces with windows on them are another colour, and workspaces with no
+windows on them are are not the active workspace are greyed out.
+
+Currently intended to be used with 9 workspaces (displayed in a 3x3 grid), and
+all additional workspaces will be hidden from the display.  If using less than
+9 workspaces it may be desireable to edit the source code to arrange the dots
+differently, instead of in the 3x3 grid.
+
+See config.h for customisation options via the preprocessor.  Remember to
+recompile for any changes to take effect (and restart your Tint2 panel).
+
+Note that since this program prints the dots using text (a unicode character),
+the selection of font is important.  Ideally you'd want to create your own font
+font (e.g. with FontForge) so you have full control over the metrics.  It would
+be a bit hacky but it'd work.
+
+Example in tint2rc configuration
+
+  #-------------------------------------
+  # Executor: workspace display
+  execp = new
+  execp_command = /path/to/binary//tint2-wsdisplay
+  # note this is set to number of lines; we output 3 lines from the program
+  execp_continuous = 3
+  execp_interval = 0
+  # required for colours
+  execp_markup = 1
+  execp_font = Noto Sans Regular 3
+  execp_has_icon = 0
+  execp_font_color = #ffffff 100
+  execp_padding = 0 0
+  execp_background_id = 0
+  execp_centered = 1
