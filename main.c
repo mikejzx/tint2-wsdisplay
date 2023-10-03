@@ -22,6 +22,11 @@
 #  define WORKSPACE_COUNT 1
 #  warning "Workspace count clamped to minimum of 1"
 #endif
+#if NUM_ROWS < 1
+#  undef NUM_ROWS
+#  define NUM_ROWS 1
+#  warning "Number of rows clamped to miniumum of 1"
+#endif
 
 struct workspaces_info
 {
@@ -42,6 +47,9 @@ Display *d;
 int screen;
 Window root;
 Atom atom_current_desktop, atom_client_list, atom_wm_desktop;
+#if !STATIC_WORKSPACE_COUNT
+  Atom atom_num_desktops;
+#endif
 
 static void do_client_list(void);
 static void do_workspace(void);
@@ -68,6 +76,9 @@ main (int argc, char *argv[])
     atom_current_desktop = XInternAtom(d, "_NET_CURRENT_DESKTOP", 1);
     atom_client_list = XInternAtom(d, "_NET_CLIENT_LIST_STACKING", 1);
     atom_wm_desktop = XInternAtom(d, "_NET_WM_DESKTOP", 1);
+    #if !STATIC_WORKSPACE_COUNT
+      atom_num_desktops = XInternAtom(d, "_NET_NUMBER_OF_DESKTOPS", 1);
+    #endif
 
     // Set initial state
     do_workspace();
@@ -106,6 +117,15 @@ main (int argc, char *argv[])
             goto do_output;
         }
 
+        #if !STATIC_WORKSPACE_COUNT
+          // Number of desktops changed
+          if (e.xproperty.atom == atom_num_desktops)
+          {
+              do_client_list();
+              goto do_output;
+          }
+        #endif
+
         // Output to the executor
         continue;
     do_output:
@@ -139,24 +159,41 @@ do_client_list(void)
         return;
     }
 
+    int n_desktops;
+    #if !STATIC_WORKSPACE_COUNT
+      // Get number of desktops
+      unsigned char *data2 = NULL;
+      if (XGetWindowProperty(d, root,
+          atom_num_desktops, 0L, sizeof(long),
+          False, XA_CARDINAL, &da, &di, &dl, &dl, &data2) != Success ||
+          !data2)
+      {
+          return;
+      }
+      n_desktops = (int)*((long *)data2);
+    #else
+      n_desktops = WORKSPACE_COUNT;
+    #endif
+
+
     // Iterate over windows
     for (int w = 0; w < (int)n_wins; ++w)
     {
         // Get _NET_WM_DESKTOP of each window
-        unsigned char *data2 = NULL;
+        unsigned char *data3 = NULL;
         if (XGetWindowProperty(d, ((Window *)data)[w], 
             atom_wm_desktop, 0L, sizeof(long),
-            False, XA_CARDINAL, &da, &di, &dl, &dl, &data2) 
-                != Success || !data2) 
+            False, XA_CARDINAL, &da, &di, &dl, &dl, &data3) 
+                != Success || !data3) 
         {
             continue;
         }
 
         // The desktop this window is on
-        int ws = (int)*((long *)data2);
+        int ws = (int)*((long *)data3);
 
         // Invalid workspace
-        if (ws < 0 || ws >= WORKSPACE_COUNT) 
+        if (ws < 0 || ws >= n_desktops) 
         {
             goto window_next;
         }
@@ -165,7 +202,7 @@ do_client_list(void)
         workspaces.w |= 1 << ws;
 
     window_next:
-        if (data2) XFree(data2);
+        if (data3) XFree(data3);
     }
 
     if (data) XFree(data);
@@ -226,11 +263,41 @@ print_output(void)
     /*
      * Print dots to represent workspace state
      */
-    for (int y = 0; y < 3; ++y)
+
+    int n_desktops;
+    #if !STATIC_WORKSPACE_COUNT
+      // Dummies
+      static Atom da;
+      static int di;
+      static unsigned long dl;
+
+      // Get number of desktops
+      unsigned char *data2 = NULL;
+      if (XGetWindowProperty(d, root,
+          atom_num_desktops, 0L, sizeof(long),
+          False, XA_CARDINAL, &da, &di, &dl, &dl, &data2) != Success ||
+          !data2)
+      {
+          return;
+      }
+      n_desktops = (int)*((long *)data2);
+    #else
+      n_desktops = WORKSPACE_COUNT;
+    #endif
+
+    // Calculate no. of columns we need per row to distribute all
+    // desktop circles across the desired no. of rows
+    int n_col = (n_desktops + NUM_ROWS - 1) / NUM_ROWS;
+
+    for (int y = 0; y < NUM_ROWS; ++y)
     {
-        for (int x = 0; x < 3; ++x)
+        for (int x = 0; x < n_col; ++x)
         {
-            int i = x + y * 3;
+            int i = x + y * n_col;
+            if (i >= n_desktops)
+            {
+              continue;
+            }
             bool has_win = workspaces.w & (1 << i);
             const char *colour = 
                 i == workspaces.active 
